@@ -86,7 +86,7 @@ All endpoints are listed with descriptions and a **Try it out** button for testi
 GET  /api/movies                         → pick a movie
 GET  /api/movies/{id}/showtimes          → pick a showtime
 GET  /api/showtimes/{id}/seats           → see available seats
-POST /api/showtimes/{id}/seats/lock      → lock your seats (10 min)
+POST /api/showtimes/{id}/seats/lock      → lock your seats (5 min)
 POST /api/bookings                       → confirm booking
 POST /api/bookings/{id}/payment          → pay (mock)
 GET  /api/bookings/{id}                  → view confirmation
@@ -102,14 +102,14 @@ The key feature of this API is **first-come-first-serve seat locking** with real
 
 1. User A opens the seat map — all seats show as `available`
 2. User A locks seat A3 → `POST /api/showtimes/1/seats/lock`
-3. The API saves the lock to the database with a 10-minute expiry
+3. The API saves the lock to the database with a 5-minute expiry
 4. A `SeatStatusChanged` event is broadcast via **Laravel Reverb** (WebSocket)
 5. All clients connected to channel `showtime.1` receive the event instantly
 6. User B's seat map updates — A3 shows as `locked` without refreshing
 7. If User B tries to lock A3, they receive `409 Conflict`
 
 **If User A abandons the booking:**
-- After 10 minutes, the lock expires automatically
+- After 5 minutes, the lock expires automatically
 - A background command (`php artisan schedule:work`) runs every minute
 - It deletes expired locks and broadcasts that the seat is `available` again
 
@@ -142,8 +142,8 @@ window.Echo.channel('showtime.1')
 | GET | `/api/movies` | ❌ | List movies (supports `?search=`) |
 | GET | `/api/movies/{id}` | ❌ | Movie detail |
 | GET | `/api/movies/{id}/showtimes` | ❌ | Showtimes for a movie |
-| GET | `/api/showtimes/{id}/seats` | ❌ | Seat map with live status |
-| POST | `/api/showtimes/{id}/seats/lock` | ✅ | Lock seats (10 min) |
+| GET | `/api/showtimes/{id}/seats` | ✅  | Seat map with live status |
+| POST | `/api/showtimes/{id}/seats/lock` | ✅ | Lock seats (5 min) |
 | DELETE | `/api/showtimes/{id}/seats/lock` | ✅ | Release seat locks |
 | GET | `/api/fnb` | ❌ | Food & beverage list |
 | POST | `/api/bookings` | ✅ | Create booking |

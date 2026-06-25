@@ -19,7 +19,8 @@ class SeatController extends Controller
     #[OA\Get(
         path: '/api/showtimes/{showtime}/seats',
         summary: 'Get seat map for a showtime',
-        description: 'Returns all seats with status: available, locked, or booked. is_mine=true if the logged-in user holds the lock.',
+        description: 'Returns all seats with status: available, locked, or booked. is_mine=true if the logged-in user holds the lock. Auth is optional — add token to see is_mine.',
+        security: [['bearerAuth' => []]],
         tags: ['Seats'],
         parameters: [new OA\Parameter(name: 'showtime', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [new OA\Response(response: 200, description: 'Seats retrieved')]
@@ -60,7 +61,7 @@ class SeatController extends Controller
 
     #[OA\Post(
         path: '/api/showtimes/{showtime}/seats/lock',
-        summary: 'Lock seats for 10 minutes',
+        summary: 'Lock seats for 5 minutes',
         description: 'First-come-first-serve. Returns 409 if another user already locked the seat.',
         security: [['bearerAuth' => []]],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(properties: [
@@ -96,7 +97,7 @@ class SeatController extends Controller
             return response()->json(['message' => 'One or more seats are already locked'], 409);
         }
 
-        $expiresAt = now()->addMinutes(10);
+        $expiresAt = now()->addMinutes(5);
 
         try {
             DB::transaction(function () use ($showtime, $seatIds, $userId, $expiresAt) {
@@ -125,7 +126,7 @@ class SeatController extends Controller
                 'seat_ids' => $seatIds,
                 'expires_at' => $expiresAt,
             ],
-            'message' => 'Seats locked for 10 minutes',
+            'message' => 'Seats locked for 5 minutes',
         ]);
     }
 

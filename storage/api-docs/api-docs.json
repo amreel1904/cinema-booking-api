@@ -385,7 +385,7 @@
                     "Seats"
                 ],
                 "summary": "Get seat map for a showtime",
-                "description": "Returns all seats with status: available, locked, or booked. is_mine=true if the logged-in user holds the lock.",
+                "description": "Returns all seats with status: available, locked, or booked. is_mine=true if the logged-in user holds the lock. Auth is optional — add token to see is_mine.",
                 "operationId": "a8fcde6a2a3a5fa0877da2c332bb0fa2",
                 "parameters": [
                     {
@@ -401,7 +401,12 @@
                     "200": {
                         "description": "Seats retrieved"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/showtimes/{showtime}/seats/lock": {
@@ -409,7 +414,7 @@
                 "tags": [
                     "Seats"
                 ],
-                "summary": "Lock seats for 10 minutes",
+                "summary": "Lock seats for 5 minutes",
                 "description": "First-come-first-serve. Returns 409 if another user already locked the seat.",
                 "operationId": "89f68ae86bdb96ec9e6ed6389b9823d4",
                 "parameters": [
