@@ -12,7 +12,8 @@ use OpenApi\Attributes as OA;
 
 #[OA\Info(title: 'Cinema Booking API', version: '1.0.0', description: 'Cinema seat booking API with real-time seat locking via WebSocket.')]
 #[OA\SecurityScheme(securityScheme: 'bearerAuth', type: 'http', scheme: 'bearer')]
-#[OA\Server(url: 'http://127.0.0.1:8004', description: 'Local')]
+//change the port number if you are running the app on a different port
+#[OA\Server(url: 'http://127.0.0.1:8000', description: 'Local')] 
 class AuthController extends Controller
 {
     #[OA\Post(

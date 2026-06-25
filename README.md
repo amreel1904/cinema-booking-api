@@ -28,6 +28,8 @@ cp .env.example .env
 php artisan key:generate
 ```
 
+If port `8080` is already in use on your machine, change `REVERB_PORT` and `REVERB_SERVER_PORT` in `.env` to a free port.
+
 **3. Run migrations and seed demo data**
 ```bash
 php artisan migrate
@@ -46,7 +48,7 @@ This creates:
 Open **3 terminal tabs** and run one command per tab:
 
 ```bash
-# Tab 1 — API server
+# Tab 1 — API server (default port 8000, use --port=XXXX if it's taken)
 php artisan serve
 
 # Tab 2 — WebSocket server (real-time seat updates)
@@ -67,6 +69,8 @@ http://127.0.0.1:8000/api/documentation
 ```
 
 All endpoints are listed with descriptions and a **Try it out** button for testing.
+
+> If you run the server on a different port, update the `OA\Server` URL in `app/Http/Controllers/Auth/AuthController.php` to match before generating the docs.
 
 **Quick start in Swagger:**
 1. Call `POST /api/auth/register` to create an account
