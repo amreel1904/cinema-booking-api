@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SeatStatusChanged;
 use App\Http\Requests\Booking\CreateBookingRequest;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
 use App\Models\BookingFnb;
 use App\Models\BookingSeat;
 use App\Models\FoodBeverage;
+use App\Models\Seat;
 use App\Models\SeatLock;
 use App\Models\Showtime;
 use Illuminate\Http\JsonResponse;
@@ -74,6 +76,13 @@ class BookingController extends Controller
 
             return $booking;
         });
+
+        // Tell all connected clients these seats are now permanently booked
+        $seats = Seat::whereIn('id', $seatIds)->get()->keyBy('id');
+        foreach ($seatIds as $seatId) {
+            $seat = $seats[$seatId];
+            SeatStatusChanged::dispatch($showtime->id, $seatId, $seat->row, $seat->number, 'booked');
+        }
 
         return response()->json([
             'data' => new BookingResource(

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SeatStatusChanged;
 use App\Http\Requests\Seat\LockSeatsRequest;
 use App\Http\Resources\SeatResource;
 use App\Models\BookingSeat;
@@ -87,6 +88,13 @@ class SeatController extends Controller
             return response()->json(['message' => 'One or more seats were just taken'], 409);
         }
 
+        // Tell all connected clients these seats are now locked
+        $seats = Seat::whereIn('id', $seatIds)->get()->keyBy('id');
+        foreach ($seatIds as $seatId) {
+            $seat = $seats[$seatId];
+            SeatStatusChanged::dispatch($showtime->id, $seatId, $seat->row, $seat->number, 'locked');
+        }
+
         return response()->json([
             'data' => [
                 'seat_ids' => $seatIds,
@@ -98,9 +106,26 @@ class SeatController extends Controller
 
     public function unlock(Showtime $showtime): JsonResponse
     {
+        // Load locks with seat info before deleting so we can broadcast
+        $locks = SeatLock::where('showtime_id', $showtime->id)
+            ->where('user_id', auth()->id())
+            ->with('seat')
+            ->get();
+
         SeatLock::where('showtime_id', $showtime->id)
             ->where('user_id', auth()->id())
             ->delete();
+
+        // Tell all connected clients these seats are available again
+        foreach ($locks as $lock) {
+            SeatStatusChanged::dispatch(
+                $lock->showtime_id,
+                $lock->seat_id,
+                $lock->seat->row,
+                $lock->seat->number,
+                'available'
+            );
+        }
 
         return response()->json(['message' => 'Seats released']);
     }
