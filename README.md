@@ -1,58 +1,150 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Cinema Booking API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A REST API for online cinema seat booking with real-time seat locking.
 
-## About Laravel
+Built with **Laravel 13**, **Laravel Reverb** (WebSocket), and documented with **Swagger UI**.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requirements
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.3+
+- Composer
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Setup
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
+**1. Clone and install**
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git clone <your-repo-url>
+cd cinema-booking-api
+composer install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+**2. Configure environment**
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-## Contributing
+**3. Run migrations and seed demo data**
+```bash
+php artisan migrate
+php artisan db:seed
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+This creates:
+- 5 movies with 10 showtimes
+- 2 halls with 50 seats each (rows A–E, numbers 1–10)
+- 8 food & beverage items
 
-## Code of Conduct
+---
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Running the Application
 
-## Security Vulnerabilities
+Open **3 terminal tabs** and run one command per tab:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+# Tab 1 — API server
+php artisan serve
 
-## License
+# Tab 2 — WebSocket server (real-time seat updates)
+php artisan reverb:start
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Tab 3 — Background scheduler (cleans expired seat locks every minute)
+php artisan schedule:work
+```
+
+---
+
+## API Documentation (Swagger UI)
+
+Open your browser and go to:
+
+```
+http://127.0.0.1:8000/api/documentation
+```
+
+All endpoints are listed with descriptions and a **Try it out** button for testing.
+
+**Quick start in Swagger:**
+1. Call `POST /api/auth/register` to create an account
+2. Call `POST /api/auth/login` — copy the `token` from the response
+3. Click **Authorize** (top right) and paste the token
+4. You're authenticated — test any endpoint
+
+---
+
+## Booking Flow
+
+```
+GET  /api/movies                         → pick a movie
+GET  /api/movies/{id}/showtimes          → pick a showtime
+GET  /api/showtimes/{id}/seats           → see available seats
+POST /api/showtimes/{id}/seats/lock      → lock your seats (10 min)
+POST /api/bookings                       → confirm booking
+POST /api/bookings/{id}/payment          → pay (mock)
+GET  /api/bookings/{id}                  → view confirmation
+```
+
+---
+
+## Real-time Seat Locking
+
+The key feature of this API is **first-come-first-serve seat locking** with real-time updates.
+
+**How it works:**
+
+1. User A opens the seat map — all seats show as `available`
+2. User A locks seat A3 → `POST /api/showtimes/1/seats/lock`
+3. The API saves the lock to the database with a 10-minute expiry
+4. A `SeatStatusChanged` event is broadcast via **Laravel Reverb** (WebSocket)
+5. All clients connected to channel `showtime.1` receive the event instantly
+6. User B's seat map updates — A3 shows as `locked` without refreshing
+7. If User B tries to lock A3, they receive `409 Conflict`
+
+**If User A abandons the booking:**
+- After 10 minutes, the lock expires automatically
+- A background command (`php artisan schedule:work`) runs every minute
+- It deletes expired locks and broadcasts that the seat is `available` again
+
+**Why WebSocket over polling:**
+
+| | Polling | WebSocket |
+|--|---------|-----------|
+| How it works | Client asks server every few seconds | Server pushes updates instantly |
+| For 50 users on same showtime | 50 requests every 3 seconds | 1 broadcast reaches all 50 |
+| Latency | Up to 3 seconds delay | Instant |
+
+**Frontend example (Laravel Echo):**
+```javascript
+window.Echo.channel('showtime.1')
+    .listen('.seat.status.changed', (data) => {
+        // data = { showtimeId, seatId, row, number, status }
+        console.log(`Seat ${data.row}${data.number} is now ${data.status}`);
+    });
+```
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/register` | ❌ | Register |
+| POST | `/api/auth/login` | ❌ | Login, get token |
+| POST | `/api/auth/logout` | ✅ | Logout |
+| GET | `/api/movies` | ❌ | List movies (supports `?search=`) |
+| GET | `/api/movies/{id}` | ❌ | Movie detail |
+| GET | `/api/movies/{id}/showtimes` | ❌ | Showtimes for a movie |
+| GET | `/api/showtimes/{id}/seats` | ❌ | Seat map with live status |
+| POST | `/api/showtimes/{id}/seats/lock` | ✅ | Lock seats (10 min) |
+| DELETE | `/api/showtimes/{id}/seats/lock` | ✅ | Release seat locks |
+| GET | `/api/fnb` | ❌ | Food & beverage list |
+| POST | `/api/bookings` | ✅ | Create booking |
+| GET | `/api/bookings/{id}` | ✅ | Booking detail |
+| GET | `/api/payment-methods` | ❌ | List payment methods |
+| POST | `/api/bookings/{id}/payment` | ✅ | Pay (mock) |
+
+✅ = Bearer token required &nbsp; ❌ = Public
