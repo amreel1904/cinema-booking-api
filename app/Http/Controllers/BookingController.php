@@ -38,12 +38,16 @@ class BookingController extends Controller
             new OA\Response(response: 401, description: 'Unauthenticated'),
         ]
     )]
+    // Creates a booking from the user's currently locked seats.
+    // Flow: verify locks → create booking record → save seats + F&B → delete locks → broadcast
     public function store(CreateBookingRequest $request): JsonResponse
     {
         $userId = auth()->id();
         $showtime = Showtime::findOrFail($request->showtime_id);
         $seatIds = $request->seat_ids;
 
+        // Verify that the user actually holds active locks for all requested seats.
+        // If the lock expired or belongs to someone else, we reject the booking.
         $lockedCount = SeatLock::where('showtime_id', $showtime->id)
             ->where('user_id', $userId)
             ->where('expires_at', '>', now())
@@ -56,16 +60,19 @@ class BookingController extends Controller
             ], 422);
         }
 
+        // Wrap everything in a transaction — if anything fails, nothing gets saved
         $booking = DB::transaction(function () use ($request, $showtime, $seatIds, $userId) {
             $fnbTotal = 0;
             $fnbItems = [];
 
+            // Calculate F&B total if user added food/drinks
             foreach ($request->fnb ?? [] as $item) {
                 $fnb = FoodBeverage::find($item['id']);
                 $fnbTotal += $fnb->price * $item['quantity'];
                 $fnbItems[] = ['model' => $fnb, 'quantity' => $item['quantity']];
             }
 
+            // Create the main booking record — status starts as 'pending' until payment
             $booking = Booking::create([
                 'user_id' => $userId,
                 'showtime_id' => $showtime->id,
@@ -73,6 +80,7 @@ class BookingController extends Controller
                 'total_amount' => round(($showtime->price * count($seatIds)) + $fnbTotal, 2),
             ]);
 
+            // Save each booked seat with the price at the time of booking
             foreach ($seatIds as $seatId) {
                 BookingSeat::create([
                     'booking_id' => $booking->id,
@@ -81,6 +89,7 @@ class BookingController extends Controller
                 ]);
             }
 
+            // Save F&B items if any
             foreach ($fnbItems as $item) {
                 BookingFnb::create([
                     'booking_id' => $booking->id,
@@ -90,6 +99,7 @@ class BookingController extends Controller
                 ]);
             }
 
+            // Remove seat locks — booking is now permanent, no need to hold the lock anymore
             SeatLock::where('showtime_id', $showtime->id)
                 ->where('user_id', $userId)
                 ->whereIn('seat_id', $seatIds)
@@ -98,7 +108,7 @@ class BookingController extends Controller
             return $booking;
         });
 
-        // Tell all connected clients these seats are now permanently booked
+        // Broadcast to all clients — these seats are now permanently booked
         $seats = Seat::whereIn('id', $seatIds)->get()->keyBy('id');
         foreach ($seatIds as $seatId) {
             $seat = $seats[$seatId];
@@ -125,8 +135,11 @@ class BookingController extends Controller
             new OA\Response(response: 404, description: 'Not found or not yours'),
         ]
     )]
+    // Returns booking detail — only accessible by the user who made the booking.
+    // Includes showtime info, seats, F&B items, and payment status.
     public function show(string $booking): JsonResponse
     {
+        // Filter by user_id so other users can't view someone else's booking
         $record = Booking::where('id', $booking)
             ->where('user_id', auth()->id())
             ->with(['showtime.movie', 'seats.seat', 'fnbs.foodBeverage', 'payment'])
