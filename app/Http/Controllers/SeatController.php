@@ -12,9 +12,18 @@ use App\Models\Showtime;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use OpenApi\Attributes as OA;
 
 class SeatController extends Controller
 {
+    #[OA\Get(
+        path: '/api/showtimes/{showtime}/seats',
+        summary: 'Get seat map for a showtime',
+        description: 'Returns all seats with status: available, locked, or booked. is_mine=true if the logged-in user holds the lock.',
+        tags: ['Seats'],
+        parameters: [new OA\Parameter(name: 'showtime', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [new OA\Response(response: 200, description: 'Seats retrieved')]
+    )]
     public function index(Showtime $showtime): JsonResponse
     {
         $seats = Seat::where('hall_id', $showtime->hall_id)->get();
@@ -49,6 +58,22 @@ class SeatController extends Controller
         ]);
     }
 
+    #[OA\Post(
+        path: '/api/showtimes/{showtime}/seats/lock',
+        summary: 'Lock seats for 10 minutes',
+        description: 'First-come-first-serve. Returns 409 if another user already locked the seat.',
+        security: [['bearerAuth' => []]],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'seat_ids', type: 'array', items: new OA\Items(type: 'integer'), example: [1, 2]),
+        ])),
+        tags: ['Seats'],
+        parameters: [new OA\Parameter(name: 'showtime', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Seats locked'),
+            new OA\Response(response: 409, description: 'Seat already taken'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
     public function lock(LockSeatsRequest $request, Showtime $showtime): JsonResponse
     {
         $seatIds = $request->seat_ids;
@@ -104,9 +129,19 @@ class SeatController extends Controller
         ]);
     }
 
+    #[OA\Delete(
+        path: '/api/showtimes/{showtime}/seats/lock',
+        summary: 'Release your seat locks',
+        security: [['bearerAuth' => []]],
+        tags: ['Seats'],
+        parameters: [new OA\Parameter(name: 'showtime', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Seats released'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
     public function unlock(Showtime $showtime): JsonResponse
     {
-        // Load locks with seat info before deleting so we can broadcast
         $locks = SeatLock::where('showtime_id', $showtime->id)
             ->where('user_id', auth()->id())
             ->with('seat')
@@ -116,7 +151,6 @@ class SeatController extends Controller
             ->where('user_id', auth()->id())
             ->delete();
 
-        // Tell all connected clients these seats are available again
         foreach ($locks as $lock) {
             SeatStatusChanged::dispatch(
                 $lock->showtime_id,

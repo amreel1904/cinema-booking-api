@@ -1,0 +1,530 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Cinema Booking API",
+        "description": "Cinema seat booking API with real-time seat locking via WebSocket.",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://127.0.0.1:8004",
+            "description": "Local"
+        }
+    ],
+    "paths": {
+        "/api/auth/register": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register a new user",
+                "operationId": "da8643013c2941f5ed7f8a9c9b4a7f7a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "example": "john@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "example": "password123"
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string",
+                                        "example": "password123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Registration successful"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Login and get access token",
+                "operationId": "535ffeda4b78916efd658b2844ea897a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "example": "john@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "example": "password123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful"
+                    },
+                    "401": {
+                        "description": "Invalid credentials"
+                    }
+                }
+            }
+        },
+        "/api/auth/logout": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Logout and invalidate token",
+                "operationId": "46f8a14c8083abb69eed72768aa08629",
+                "responses": {
+                    "200": {
+                        "description": "Logged out"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/bookings": {
+            "post": {
+                "tags": [
+                    "Bookings"
+                ],
+                "summary": "Create a booking",
+                "description": "Requires active seat locks. Converts locks to a permanent booking and removes them.",
+                "operationId": "e33fa5a6507581f9b1e0d710a9a130d1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "showtime_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "seat_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2
+                                        ]
+                                    },
+                                    "fnb": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "quantity": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Booking created"
+                    },
+                    "422": {
+                        "description": "Seat locks expired or not yours"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/bookings/{booking}": {
+            "get": {
+                "tags": [
+                    "Bookings"
+                ],
+                "summary": "Get booking detail",
+                "description": "Only the booking owner can view this.",
+                "operationId": "5b1a917e6c62a1029dd759b1587c276b",
+                "parameters": [
+                    {
+                        "name": "booking",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Booking retrieved"
+                    },
+                    "404": {
+                        "description": "Not found or not yours"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/fnb": {
+            "get": {
+                "tags": [
+                    "Food & Beverage"
+                ],
+                "summary": "List all food and beverage items",
+                "operationId": "2e9ec1308b3aab341e386c61d73a178d",
+                "responses": {
+                    "200": {
+                        "description": "Food and beverages retrieved"
+                    }
+                }
+            }
+        },
+        "/api/movies": {
+            "get": {
+                "tags": [
+                    "Movies"
+                ],
+                "summary": "List all movies",
+                "operationId": "a7859dc5cd106bbeae5492e22df893ec",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search by title",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Movies retrieved"
+                    }
+                }
+            }
+        },
+        "/api/movies/{id}": {
+            "get": {
+                "tags": [
+                    "Movies"
+                ],
+                "summary": "Get movie detail",
+                "operationId": "a7031f1ec2eb856acbdd7f7054ed001d",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Movie retrieved"
+                    },
+                    "404": {
+                        "description": "Not found"
+                    }
+                }
+            }
+        },
+        "/api/movies/{id}/showtimes": {
+            "get": {
+                "tags": [
+                    "Movies"
+                ],
+                "summary": "List showtimes for a movie",
+                "operationId": "2803b53faaa7e45b3f5ae7f117cc829c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Showtimes retrieved"
+                    }
+                }
+            }
+        },
+        "/api/payment-methods": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "List available payment methods",
+                "operationId": "4c770815c03aa5f4789da5aae7758739",
+                "responses": {
+                    "200": {
+                        "description": "Payment methods retrieved"
+                    }
+                }
+            }
+        },
+        "/api/bookings/{booking}/payment": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Pay for a booking (mock)",
+                "description": "Immediately confirms payment. No real gateway — demo only.",
+                "operationId": "ecf900fbbf827f1536e3b5af6de76436",
+                "parameters": [
+                    {
+                        "name": "booking",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "method": {
+                                        "type": "string",
+                                        "example": "credit_card",
+                                        "enum": [
+                                            "credit_card",
+                                            "debit_card",
+                                            "online_banking",
+                                            "ewallet"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Payment confirmed"
+                    },
+                    "422": {
+                        "description": "Booking already paid"
+                    },
+                    "404": {
+                        "description": "Booking not found or not yours"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/showtimes/{showtime}/seats": {
+            "get": {
+                "tags": [
+                    "Seats"
+                ],
+                "summary": "Get seat map for a showtime",
+                "description": "Returns all seats with status: available, locked, or booked. is_mine=true if the logged-in user holds the lock.",
+                "operationId": "a8fcde6a2a3a5fa0877da2c332bb0fa2",
+                "parameters": [
+                    {
+                        "name": "showtime",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Seats retrieved"
+                    }
+                }
+            }
+        },
+        "/api/showtimes/{showtime}/seats/lock": {
+            "post": {
+                "tags": [
+                    "Seats"
+                ],
+                "summary": "Lock seats for 10 minutes",
+                "description": "First-come-first-serve. Returns 409 if another user already locked the seat.",
+                "operationId": "89f68ae86bdb96ec9e6ed6389b9823d4",
+                "parameters": [
+                    {
+                        "name": "showtime",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "seat_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Seats locked"
+                    },
+                    "409": {
+                        "description": "Seat already taken"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Seats"
+                ],
+                "summary": "Release your seat locks",
+                "operationId": "c3f595c9716eea8d86817d273ed1ae06",
+                "parameters": [
+                    {
+                        "name": "showtime",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Seats released"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Auth",
+            "description": "Auth"
+        },
+        {
+            "name": "Bookings",
+            "description": "Bookings"
+        },
+        {
+            "name": "Food & Beverage",
+            "description": "Food & Beverage"
+        },
+        {
+            "name": "Movies",
+            "description": "Movies"
+        },
+        {
+            "name": "Payment",
+            "description": "Payment"
+        },
+        {
+            "name": "Seats",
+            "description": "Seats"
+        }
+    ]
+}
